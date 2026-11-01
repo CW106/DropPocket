@@ -9,8 +9,12 @@ namespace DropPocket
     // 一般可以啟用的視窗（要拿得到鍵盤焦點才能錄快捷鍵），不像口袋本身是 NOACTIVATE
     class SettingsForm : Form
     {
-        const string OccupiedText = "這組快捷鍵已被其他程式佔用，請換一組";
-        const string DuplicateText = "和另一個快捷鍵重複了";
+        static string OccupiedText
+        {
+            get { return L.T("這組快捷鍵已被其他程式佔用，請換一組", "Another app is already using this hotkey. Try a different one."); }
+        }
+
+        static string DuplicateText { get { return L.T("和另一個快捷鍵重複了", "Same as the other hotkey"); } }
 
         static readonly Color[] AccentPresets =
         {
@@ -18,8 +22,10 @@ namespace DropPocket
             Rgb(0xF59E0B), Rgb(0x22C55E), Rgb(0x14B8A6), Rgb(0x94A3B8),
         };
         static readonly string[] AccentNames = { "藍", "紫", "粉", "紅", "橘", "綠", "青", "灰" };
+        static readonly string[] AccentNamesEn = { "Blue", "Purple", "Pink", "Red", "Orange", "Green", "Teal", "Gray" };
         static readonly Color[] BgPresets = { Rgb(0x1E1F24), Rgb(0x0B0B0D), Rgb(0x161C2C), Rgb(0xF3F4F6), Rgb(0xFFFFFF) };
         static readonly string[] BgNames = { "深灰", "純黑", "深藍", "淺灰", "白" };
+        static readonly string[] BgNamesEn = { "Dark gray", "Black", "Navy", "Light gray", "White" };
         static int[] customColors; // 調色盤裡的自訂色，程式結束前都記得
 
         class HotkeyRow
@@ -39,7 +45,7 @@ namespace DropPocket
         Swatch accentCustom, bgCustom;
         HotkeyRow rowToggle, rowHide;
         Label hint;
-        OptionBox optRight, optLeft, optKeep, optAuto;
+        OptionBox optRight, optLeft, optKeep, optAuto, optLangAuto, optLangZh, optLangEn;
         Button btnReset, btnDone;
         Panel divider;
         Theme theme;
@@ -59,7 +65,7 @@ namespace DropPocket
             pocket = owner;
             s = Gfx.Scale;
             theme = owner.CurrentTheme;
-            Text = "暫存口袋 設定";
+            Text = L.T("暫存口袋 設定", "DropPocket Settings");
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -87,48 +93,57 @@ namespace DropPocket
         {
             int pad = S(20), width = S(440), right = width - pad, y = S(12);
 
-            AddSection("外觀", pad, ref y);
-            AddCaption("主題色", pad, ref y);
-            accentCustom = AddSwatchRow(AccentPresets, AccentNames, accentSwatches, true, pad, ref y);
-            AddCaption("面板底色", pad, ref y);
-            bgCustom = AddSwatchRow(BgPresets, BgNames, bgSwatches, false, pad, ref y);
+            AddSection(L.T("外觀", "Appearance"), pad, ref y);
+            AddCaption(L.T("主題色", "Accent color"), pad, ref y);
+            accentCustom = AddSwatchRow(AccentPresets, L.En ? AccentNamesEn : AccentNames, accentSwatches, true, pad, ref y);
+            AddCaption(L.T("面板底色", "Panel background"), pad, ref y);
+            bgCustom = AddSwatchRow(BgPresets, L.En ? BgNamesEn : BgNames, bgSwatches, false, pad, ref y);
 
             y += S(4);
-            AddSection("快捷鍵", pad, ref y);
-            rowToggle = AddHotkeyRow("顯示 / 隱藏口袋", false, pad, right, ref y);
-            rowHide = AddHotkeyRow("完全隱藏邊緣小條", true, pad, right, ref y);
-            hint = new Label { Text = "點一下方框，再按下新的組合鍵", AutoSize = true, Font = smallFont, Location = new Point(pad, y) };
+            AddSection(L.T("快捷鍵", "Hotkeys"), pad, ref y);
+            rowToggle = AddHotkeyRow(L.T("顯示 / 隱藏口袋", "Show / hide pocket"), false, pad, right, ref y);
+            rowHide = AddHotkeyRow(L.T("完全隱藏邊緣小條", "Hide edge tab"), true, pad, right, ref y);
+            hint = new Label
+            {
+                Text = L.T("點一下方框，再按下新的組合鍵", "Click a box, then press the new key combination"),
+                AutoSize = true,
+                Font = smallFont,
+                Location = new Point(pad, y),
+            };
             Controls.Add(hint);
             y += S(30);
 
-            AddSection("一般", pad, ref y);
-            var dock = new Label
-            {
-                Text = "停靠位置",
-                AutoSize = false,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Bounds = new Rectangle(pad, y, S(100), S(26)),
-            };
-            Controls.Add(dock);
-            captions.Add(dock);
-            optRight = AddOption("右側", true, pad + S(104), y);
-            optLeft = AddOption("左側", true, optRight.Right + S(16), y);
+            AddSection(L.T("一般", "General"), pad, ref y);
+            AddRowLabel(L.T("停靠位置", "Dock side"), pad, y);
+            optRight = AddOption(L.T("右側", "Right"), true, pad + S(104), y);
+            optLeft = AddOption(L.T("左側", "Left"), true, optRight.Right + S(16), y);
             y += S(32);
-            optKeep = AddOption("拖出後保留項目", false, pad, y);
+            // 語言名稱一律用該語言本身寫，看不懂目前語言的人也找得到
+            AddRowLabel(L.T("語言", "Language"), pad, y);
+            optLangAuto = AddOption(L.T("自動", "Auto"), true, pad + S(104), y);
+            optLangZh = AddOption("繁體中文", true, optLangAuto.Right + S(16), y);
+            optLangEn = AddOption("English", true, optLangZh.Right + S(16), y);
+            tips.SetToolTip(optLangAuto, L.T("跟著 Windows 的顯示語言", "Follow the Windows display language"));
+            y += S(32);
+            optKeep = AddOption(L.T("拖出後保留項目", "Keep items after dragging out"), false, pad, y);
             y += S(30);
-            optAuto = AddOption("開機時自動啟動", false, pad, y);
+            optAuto = AddOption(L.T("開機時自動啟動", "Start with Windows"), false, pad, y);
             y += S(38);
 
             divider = new Panel { Bounds = new Rectangle(0, y, width, Math.Max(1, S(1))) };
             Controls.Add(divider);
             y += S(14);
-            btnReset = AddButton("恢復預設", new Rectangle(pad, y, S(100), S(32)));
-            btnDone = AddButton("完成", new Rectangle(right - S(92), y, S(92), S(32)));
-            tips.SetToolTip(btnReset, "把主題色、面板底色和兩組快捷鍵恢復成預設值");
+            btnReset = AddButton(L.T("恢復預設", "Reset"), new Rectangle(pad, y, S(100), S(32)));
+            btnDone = AddButton(L.T("完成", "Done"), new Rectangle(right - S(92), y, S(92), S(32)));
+            tips.SetToolTip(btnReset, L.T("把主題色、面板底色和兩組快捷鍵恢復成預設值",
+                "Reset the accent color, panel background and both hotkeys"));
             y += S(32) + S(14);
 
             optRight.UserToggled += (o, e) => Safe(() => pocket.SetDockRight(true));
             optLeft.UserToggled += (o, e) => Safe(() => pocket.SetDockRight(false));
+            optLangAuto.UserToggled += (o, e) => Safe(() => pocket.SetLanguage("auto"));
+            optLangZh.UserToggled += (o, e) => Safe(() => pocket.SetLanguage("zh"));
+            optLangEn.UserToggled += (o, e) => Safe(() => pocket.SetLanguage("en"));
             optKeep.UserToggled += (o, e) => Safe(() => pocket.SetKeepAfterDrag(!pocket.KeepAfterDrag));
             optAuto.UserToggled += (o, e) => Safe(() => pocket.SetAutostart(!pocket.AutostartEnabled));
             btnReset.Click += (o, e) => Safe(ResetDefaults);
@@ -143,6 +158,20 @@ namespace DropPocket
             Controls.Add(l);
             sections.Add(l);
             y += S(28);
+        }
+
+        // 一行選項前面的標題（停靠位置、語言）
+        void AddRowLabel(string text, int x, int y)
+        {
+            var l = new Label
+            {
+                Text = text,
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Bounds = new Rectangle(x, y, S(100), S(26)),
+            };
+            Controls.Add(l);
+            captions.Add(l);
         }
 
         void AddCaption(string text, int x, ref int y)
@@ -166,10 +195,11 @@ namespace DropPocket
                 into.Add(sw);
             }
             int cx = x + colors.Length * (d + gap) + S(4);
-            int cw = d + TextRenderer.MeasureText("自訂…", Font).Width + S(10);
-            var custom = new Swatch { IsCustom = true, Text = "自訂…", Bounds = new Rectangle(cx, y, cw, d) };
+            string customText = L.T("自訂…", "Custom…");
+            int cw = d + TextRenderer.MeasureText(customText, Font).Width + S(10);
+            var custom = new Swatch { IsCustom = true, Text = customText, Bounds = new Rectangle(cx, y, cw, d) };
             custom.Click += (o, e) => Safe(() => PickCustom(accent));
-            tips.SetToolTip(custom, accent ? "自訂主題色" : "自訂面板底色");
+            tips.SetToolTip(custom, accent ? L.T("自訂主題色", "Custom accent color") : L.T("自訂面板底色", "Custom panel background"));
             Controls.Add(custom);
             y += d + S(14);
             return custom;
@@ -190,7 +220,7 @@ namespace DropPocket
             Controls.Add(r.Caption);
             Controls.Add(r.Box);
             int cx = r.Box.Right + S(8);
-            r.Clear = AddButton("清除", new Rectangle(cx, y, Math.Max(S(48), right - cx), h));
+            r.Clear = AddButton(L.T("清除", "Clear"), new Rectangle(cx, y, Math.Max(S(48), right - cx), h));
             r.Status = new Label
             {
                 AutoSize = false,
@@ -200,8 +230,8 @@ namespace DropPocket
             };
             Controls.Add(r.Status);
             captions.Add(r.Caption);
-            tips.SetToolTip(r.Box, "Esc 取消 · Backspace / Delete 清除");
-            tips.SetToolTip(r.Clear, "不使用快捷鍵");
+            tips.SetToolTip(r.Box, L.T("Esc 取消 · Backspace / Delete 清除", "Esc cancels · Backspace / Delete clears"));
+            tips.SetToolTip(r.Clear, L.T("不使用快捷鍵", "Don't use a hotkey"));
 
             r.Box.RecordingChanged += (o, e) => Safe(UpdateHotkeySuspend);
             r.Box.Committed += k => Safe(() => ApplyHotkey(r, k));
@@ -245,7 +275,7 @@ namespace DropPocket
                 r.Status.ForeColor = r.Error ? t.Danger : t.Sub;
                 StyleButton(r.Clear, false);
             }
-            foreach (OptionBox ob in new[] { optRight, optLeft, optKeep, optAuto }) ob.Palette = t;
+            foreach (OptionBox ob in new[] { optRight, optLeft, optLangAuto, optLangZh, optLangEn, optKeep, optAuto }) ob.Palette = t;
             StyleButton(btnReset, false);
             StyleButton(btnDone, true);
             divider.BackColor = t.Border;
@@ -336,7 +366,7 @@ namespace DropPocket
         void ShowResult(HotkeyRow r, HotkeyResult res)
         {
             r.Box.Value = pocket.GetHotkey(r.Hide);
-            if (res == HotkeyResult.Ok) SetStatus(r, "已套用", false);
+            if (res == HotkeyResult.Ok) SetStatus(r, L.T("已套用", "Applied"), false);
             else SetStatus(r, res == HotkeyResult.Occupied ? OccupiedText : DuplicateText, true);
         }
 
@@ -372,6 +402,10 @@ namespace DropPocket
             bool right = pocket.RightEdge;
             optRight.Checked = right;
             optLeft.Checked = !right;
+            string lang = pocket.LanguageMode;
+            optLangAuto.Checked = lang == "auto";
+            optLangZh.Checked = lang == "zh";
+            optLangEn.Checked = lang == "en";
             optKeep.Checked = pocket.KeepAfterDrag;
             optAuto.Checked = pocket.AutostartEnabled;
         }

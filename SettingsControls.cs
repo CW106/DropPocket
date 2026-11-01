@@ -240,7 +240,7 @@ namespace DropPocket
             if (code == Keys.Back || code == Keys.Delete) { Commit(HotkeyCombo.None); return; }
             if (HotkeyCombo.IsModifierKey(code)) { note = null; Invalidate(); return; }
             var k = new HotkeyCombo((keyData & Keys.Control) != 0, (keyData & Keys.Alt) != 0, (keyData & Keys.Shift) != 0, code);
-            if (!k.IsValid) { note = "要搭配 Ctrl 或 Alt"; Invalidate(); return; }
+            if (!k.IsValid) { note = L.T("要搭配 Ctrl 或 Alt", "Needs Ctrl or Alt"); Invalidate(); return; }
             Commit(k);
         }
 
@@ -285,9 +285,9 @@ namespace DropPocket
                 string held = HeldModifiers();
                 if (held.Length > 0) { text = held + " + …"; fore = t.Text; }
                 else if (note != null) { text = note; fore = t.Danger; }
-                else { text = "請按下組合鍵…"; fore = t.Sub; }
+                else { text = L.T("請按下組合鍵…", "Press a key combination…"); fore = t.Sub; }
             }
-            else if (combo.IsNone) { text = "無"; fore = t.Sub; }
+            else if (combo.IsNone) { text = L.T("無", "None"); fore = t.Sub; }
             else { text = combo.Display; fore = t.Text; }
             int pad = (int)Math.Round(10 * sc);
             TextRenderer.DrawText(g, text, Font, new Rectangle(pad, 0, Math.Max(1, w - 2 * pad), h), fore,

@@ -113,7 +113,7 @@ namespace DropPocket
 
         Button MakeGearButton()
         {
-            Button b = MakeHeaderButton("", "設定（顏色、快捷鍵）");
+            Button b = MakeHeaderButton("", null); // 提示文字由 ApplyTexts 設定
             b.Width = S(28);
             b.Paint += PaintGear;
             b.Click += (o, e) => ShowSettings();
@@ -240,10 +240,15 @@ namespace DropPocket
         void UpdateHotkeyTexts()
         {
             string t = toggleKey.Display, h = hideKey.Display;
-            footer.Text = "雙擊開啟 · 右鍵更多" + (t.Length > 0 ? " · " + t + " 釘選" : "");
-            toolTip.SetToolTip(btnPin, "固定展開口袋" + (t.Length > 0 ? "（" + t + "）" : ""));
-            miToggle.Text = "顯示 / 隱藏口袋" + (t.Length > 0 ? "　" + t : "");
-            miHideTab.Text = "隱藏邊緣小條" + (h.Length > 0 ? "　" + h : "");
+            // 英文比較長，底部提示放不下「右鍵更多」，設了快捷鍵時就只留快捷鍵
+            footer.Text = L.En
+                ? "Double-click opens" + (t.Length > 0 ? " · " + t + " pins" : " · Right-click for more")
+                : "雙擊開啟 · 右鍵更多" + (t.Length > 0 ? " · " + t + " 釘選" : "");
+            toolTip.SetToolTip(btnPin, L.T("固定展開口袋", "Keep the pocket open")
+                + (t.Length > 0 ? L.T("（" + t + "）", " (" + t + ")") : ""));
+            string gap = L.T("　", "    ");
+            miToggle.Text = L.T("顯示 / 隱藏口袋", "Show / hide pocket") + (t.Length > 0 ? gap + t : "");
+            miHideTab.Text = L.T("隱藏邊緣小條", "Hide edge tab") + (h.Length > 0 ? gap + h : "");
         }
 
         // ---------- 完全隱藏邊緣小條 ----------
@@ -303,6 +308,12 @@ namespace DropPocket
 
         void ShowSettings()
         {
+            ShowSettings(null);
+        }
+
+        // at：重建設定視窗（例如切換語言）時放回原本的位置
+        void ShowSettings(Point? at)
+        {
             try
             {
                 if (tabHidden) SetTabHidden(false);
@@ -314,6 +325,11 @@ namespace DropPocket
                     return;
                 }
                 var f = new SettingsForm(this);
+                if (at.HasValue)
+                {
+                    f.StartPosition = FormStartPosition.Manual;
+                    f.Location = at.Value;
+                }
                 f.FormClosed += OnSettingsClosed;
                 settings = f;
                 // 設定視窗開著時口袋保持展開，當作即時預覽

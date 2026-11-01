@@ -32,11 +32,14 @@ namespace DropPocket
         static void Main()
         {
             bool created;
+            L.Set("auto");
             using (var mutex = new System.Threading.Mutex(true, "DropPocket.SingleInstance", out created))
             {
                 if (!created)
                 {
-                    MessageBox.Show("暫存口袋已經在執行中（看看螢幕邊緣或系統匣）。", "暫存口袋");
+                    MessageBox.Show(L.T("暫存口袋已經在執行中（看看螢幕邊緣或系統匣）。",
+                        "DropPocket is already running (look at the edge of your screen or in the system tray)."),
+                        L.T("暫存口袋", "DropPocket"));
                     return;
                 }
                 try { SetProcessDPIAware(); } catch { }
@@ -73,7 +76,7 @@ namespace DropPocket
         {
             get
             {
-                if (IsText) return "文字";
+                if (IsText) return L.T("文字", "Text");
                 return Path.GetDirectoryName(FilePath.TrimEnd('\\')) ?? FilePath;
             }
         }
@@ -357,7 +360,8 @@ namespace DropPocket
             LoadItems();
             CleanupReceived();
             WireDrop(this);
-            RefreshList();
+            // 讀到 lang= 之後才知道要用哪個語言，介面文字都在這裡套用
+            ApplyTexts();
             UpdateMenuChecks();
             // 讀進來的配色與快捷鍵（介面先用預設配色建好）
             ApplyTheme();
@@ -372,8 +376,10 @@ namespace DropPocket
             SystemEvents.DisplaySettingsChanged += (o, e) => ApplyBounds();
 
             if (firstRun)
-                tray.ShowBalloonTip(6000, "暫存口袋已啟動",
-                    "口袋藏在螢幕" + (rightEdge ? "右" : "左") + "側邊緣的小條。拖著檔案碰一下它就能放進去，切換好視窗再從口袋拖出來。",
+                tray.ShowBalloonTip(6000, L.T("暫存口袋已啟動", "DropPocket is running"),
+                    L.T("口袋藏在螢幕" + (rightEdge ? "右" : "左") + "側邊緣的小條。拖著檔案碰一下它就能放進去，切換好視窗再從口袋拖出來。",
+                        "The pocket is the small tab on the " + (rightEdge ? "right" : "left")
+                        + " edge of your screen. Drag a file onto it to drop it in, then switch windows and drag it back out."),
                     ToolTipIcon.Info);
         }
 
@@ -435,9 +441,10 @@ namespace DropPocket
             toolTip = new ToolTip();
 
             header = new Panel { Dock = DockStyle.Top, Height = S(36), BackColor = theme.Header };
-            btnAll = MakeHeaderButton("全部拖出", "按住這裡拖曳，一次拖出口袋裡所有項目");
-            btnClear = MakeHeaderButton("清空", "清空口袋（不會刪除任何檔案）");
-            btnPin = MakeHeaderButton("釘選", "固定展開口袋（Ctrl+Alt+P）");
+            // 按鈕文字、提示都由 ApplyTexts 依語言設定
+            btnAll = MakeHeaderButton("", null);
+            btnClear = MakeHeaderButton("", null);
+            btnPin = MakeHeaderButton("", null);
             title = new SingleLineLabel
             {
                 Dock = DockStyle.Fill,
@@ -447,9 +454,7 @@ namespace DropPocket
                 Font = new Font(Font, FontStyle.Bold),
                 Cursor = Cursors.SizeAll,
                 AutoEllipsis = true, // 標題太長就省略，右邊的按鈕不能被擠掉
-                Text = "暫存口袋",
             };
-            toolTip.SetToolTip(title, "拖這裡可以移動口袋（拖到螢幕另一側就換邊）");
             btnGear = MakeGearButton();
             header.Controls.Add(btnAll);
             header.Controls.Add(btnClear);
@@ -494,11 +499,11 @@ namespace DropPocket
             title.MouseUp += (o, e) => { if (movingHeader) { movingHeader = false; SaveSettings(); UpdateMenuChecks(); } };
 
             itemMenu = new ContextMenuStrip();
-            itemMenu.Items.Add("開啟", null, (o, e) => OpenSelected());
-            itemMenu.Items.Add("在檔案總管中顯示", null, (o, e) => RevealSelected());
-            itemMenu.Items.Add("複製路徑 / 文字", null, (o, e) => CopySelected());
+            miOpen = itemMenu.Items.Add("", null, (o, e) => OpenSelected());
+            miReveal = itemMenu.Items.Add("", null, (o, e) => RevealSelected());
+            miCopy = itemMenu.Items.Add("", null, (o, e) => CopySelected());
             itemMenu.Items.Add(new ToolStripSeparator());
-            itemMenu.Items.Add("從口袋移除", null, (o, e) => RemoveItems(SelectedItems()));
+            miRemove = itemMenu.Items.Add("", null, (o, e) => RemoveItems(SelectedItems()));
             itemMenu.Opening += (o, e) => { if (list.SelectedItems.Count == 0) e.Cancel = true; };
             itemMenu.Opened += (o, e) => menuOpen = true;
             itemMenu.Closed += (o, e) => menuOpen = false;
@@ -588,24 +593,24 @@ namespace DropPocket
         void BuildTray()
         {
             var menu = new ContextMenuStrip();
-            // 文字裡的快捷鍵由 UpdateHotkeyTexts 補上
-            miToggle = new ToolStripMenuItem("顯示 / 隱藏口袋", null, (o, e) => Safe(OnToggleRequest));
-            miHideTab = new ToolStripMenuItem("隱藏邊緣小條", null, (o, e) => Safe(() => SetTabHidden(!tabHidden)));
+            // 選單文字由 ApplyTexts / UpdateHotkeyTexts 依語言與快捷鍵設定
+            miToggle = new ToolStripMenuItem("", null, (o, e) => Safe(OnToggleRequest));
+            miHideTab = new ToolStripMenuItem("", null, (o, e) => Safe(() => SetTabHidden(!tabHidden)));
             menu.Items.Add(miToggle);
             menu.Items.Add(miHideTab);
             menu.Items.Add(new ToolStripSeparator());
-            miLeft = new ToolStripMenuItem("停靠在左側", null, (o, e) => SetEdge(false));
-            miRight = new ToolStripMenuItem("停靠在右側", null, (o, e) => SetEdge(true));
-            miKeep = new ToolStripMenuItem("拖出後保留項目", null, (o, e) => { keepAfterDrag = !keepAfterDrag; SaveSettings(); UpdateMenuChecks(); });
-            miAutostart = new ToolStripMenuItem("開機時自動啟動", null, (o, e) => ToggleAutostart());
+            miLeft = new ToolStripMenuItem("", null, (o, e) => SetEdge(false));
+            miRight = new ToolStripMenuItem("", null, (o, e) => SetEdge(true));
+            miKeep = new ToolStripMenuItem("", null, (o, e) => { keepAfterDrag = !keepAfterDrag; SaveSettings(); UpdateMenuChecks(); });
+            miAutostart = new ToolStripMenuItem("", null, (o, e) => ToggleAutostart());
             menu.Items.Add(miLeft);
             menu.Items.Add(miRight);
             menu.Items.Add(miKeep);
             menu.Items.Add(miAutostart);
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add("設定…", null, (o, e) => ShowSettings());
-            menu.Items.Add("開啟暫存資料夾", null, (o, e) => { Directory.CreateDirectory(receivedDir); Process.Start("explorer.exe", "\"" + receivedDir + "\""); });
-            menu.Items.Add("結束", null, (o, e) => Close());
+            miSettings = menu.Items.Add("", null, (o, e) => ShowSettings());
+            miOpenFolder = menu.Items.Add("", null, (o, e) => { Directory.CreateDirectory(receivedDir); Process.Start("explorer.exe", "\"" + receivedDir + "\""); });
+            miExit = menu.Items.Add("", null, (o, e) => Close());
 
             tray = new NotifyIcon { Icon = appIcon, Text = "暫存口袋", Visible = true, ContextMenuStrip = menu };
             tray.MouseClick += (o, e) => { if (e.Button == MouseButtons.Left) Safe(OnToggleRequest); };
@@ -1098,7 +1103,7 @@ namespace DropPocket
                 {
                     string name = Path.GetFileName(files[0].TrimEnd('\\'));
                     if (string.IsNullOrEmpty(name)) name = files[0];
-                    return files.Length + " 個項目 · " + Shorten(name, 28);
+                    return L.Count(files.Length, "個項目", "item", "items") + " · " + Shorten(name, 28);
                 }
                 bool hasText = d.GetDataPresent(DataFormats.UnicodeText);
                 var ms = d.GetDataPresent("FileGroupDescriptorW") ? d.GetData("FileGroupDescriptorW") as MemoryStream : null;
@@ -1107,10 +1112,11 @@ namespace DropPocket
                     bool hasFolder;
                     List<string> tops = VirtualFiles.TopLevelNames(ms.ToArray(), out hasFolder);
                     // 和 AddFromData 一樣：瀏覽器連結附帶的單一 .url 捷徑最後會存成文字
-                    if (tops.Count == 1 && hasText && tops[0].EndsWith(".url", StringComparison.OrdinalIgnoreCase)) return "一段文字";
-                    if (tops.Count > 0) return tops.Count + (hasFolder ? " 個項目" : " 個檔案");
+                    if (tops.Count == 1 && hasText && tops[0].EndsWith(".url", StringComparison.OrdinalIgnoreCase)) return L.T("一段文字", "Some text");
+                    if (tops.Count > 0)
+                        return hasFolder ? L.Count(tops.Count, "個項目", "item", "items") : L.Count(tops.Count, "個檔案", "file", "files");
                 }
-                if (hasText) return "一段文字";
+                if (hasText) return L.T("一段文字", "Some text");
             }
             catch { }
             return "";
@@ -1145,7 +1151,8 @@ namespace DropPocket
             catch (Exception ex)
             {
                 try { File.AppendAllText(Path.Combine(dataDir, "error.log"), DateTime.Now + " " + ex + Environment.NewLine); } catch { }
-                tray.ShowBalloonTip(4000, "暫存口袋", "無法放進口袋：" + ex.Message, ToolTipIcon.Warning);
+                tray.ShowBalloonTip(4000, L.T("暫存口袋", "DropPocket"),
+                    L.T("無法放進口袋：", "Couldn't add to the pocket: ") + ex.Message, ToolTipIcon.Warning);
             }
             if (added != null && added.Count > 0)
             {
@@ -1299,7 +1306,7 @@ namespace DropPocket
             {
                 var lvi = new ListViewItem(it.Name, IconKey(it));
                 bool exists = it.Exists;
-                lvi.SubItems.Add(exists ? it.Detail : "（找不到了）");
+                lvi.SubItems.Add(exists ? it.Detail : L.T("（找不到了）", "(missing)"));
                 lvi.ToolTipText = it.IsText ? (it.Text.Length > 400 ? it.Text.Substring(0, 400) + "…" : it.Text) : it.FilePath;
                 lvi.Tag = it;
                 if (!exists) lvi.ForeColor = theme.Sub;
@@ -1307,7 +1314,9 @@ namespace DropPocket
             }
             list.EndUpdate();
             list.Sync();
-            title.Text = items.Count > 0 ? "暫存口袋 · " + items.Count : "暫存口袋";
+            // 英文標題用短的 Pocket：「DropPocket · 12」會被右邊的英文按鈕擠到截斷
+            string appName = L.T("暫存口袋", "Pocket");
+            title.Text = items.Count > 0 ? appName + " · " + items.Count : appName;
             UpdateListVisibility();
             if (badgeCount != items.Count)
             {
@@ -1383,6 +1392,7 @@ namespace DropPocket
                     }
                     else if (k == "keep") keepAfterDrag = v == "1";
                     else if (k == "screen") screenName = v;
+                    else if (k == "lang") L.Set(v);
                     else if (k == "accent") { Color c; if (Theme.TryParseHex(v, out c)) accent = c; }
                     else if (k == "bg") { Color c; if (Theme.TryParseHex(v, out c)) bg = c; }
                     // 空白 = 不使用快捷鍵；格式不對就用預設
@@ -1406,6 +1416,7 @@ namespace DropPocket
                     "y=" + yFrac.ToString("0.###", CultureInfo.InvariantCulture),
                     "keep=" + (keepAfterDrag ? "1" : "0"),
                     "screen=" + (screenName ?? ""),
+                    "lang=" + L.Mode,
                     "accent=" + Theme.ToHex(theme.Accent),
                     "bg=" + Theme.ToHex(theme.Background),
                     "hotkey=" + toggleKey.Serialize(),

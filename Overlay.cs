@@ -158,7 +158,7 @@ namespace DropPocket
 
                 int mh = mainFont.Height, sh = subFont.Height;
                 int ty = (int)(trayY + Gfx.S(34));
-                TextRenderer.DrawText(g, "放開即可放進口袋", mainFont, new Rectangle(0, ty, w, mh),
+                TextRenderer.DrawText(g, L.T("放開即可放進口袋", "Release to drop into the pocket"), mainFont, new Rectangle(0, ty, w, mh),
                     Ease.Lerp(palette.Background, palette.Text, a), CenterLine);
                 if (subLine.Length > 0)
                     TextRenderer.DrawText(g, subLine, subFont, new Rectangle(Gfx.S(24), ty + mh + Gfx.S(4), Math.Max(1, w - Gfx.S(48)), sh),
@@ -188,7 +188,7 @@ namespace DropPocket
             }
             float ta = (float)Ease.Clamp01((ts - 90) / 150.0) * end;
             if (ta > 0.01f)
-                TextRenderer.DrawText(g, "已放進 " + addedCount + " 項", mainFont,
+                TextRenderer.DrawText(g, L.T("已放進 " + addedCount + " 項", "Added " + L.Count(addedCount, "", "item", "items")), mainFont,
                     new Rectangle(0, (int)(ccy + Gfx.S(38)), w, mainFont.Height), Ease.Lerp(palette.Background, palette.Text, ta), CenterLine);
         }
 
@@ -207,7 +207,16 @@ namespace DropPocket
     // 口袋是空的時候顯示的提示（靜態）
     class EmptyState : PaintBox
     {
-        static readonly string[] Lines = { "把檔案拖到這裡", "", "切換到目標視窗後", "再從這裡拖出去" };
+        // 每次畫的時候才取，切換語言後重畫就會換掉
+        static string[] Lines
+        {
+            get
+            {
+                return L.En
+                    ? new[] { "Drag files here", "", "Switch to the window you need,", "then drag them out from here" }
+                    : new[] { "把檔案拖到這裡", "", "切換到目標視窗後", "再從這裡拖出去" };
+            }
+        }
 
         Theme palette = Theme.Default;
 
@@ -239,17 +248,18 @@ namespace DropPocket
                 g.DrawPath(pen, path);
             }
 
+            string[] lines = Lines;
             int lineH = Font.Height;
             float glyph = Gfx.S(48), gap = Gfx.S(12);
-            float top = (h - (glyph + gap + lineH * Lines.Length)) / 2f;
+            float top = (h - (glyph + gap + lineH * lines.Length)) / 2f;
             using (var pen = Gfx.RoundPen(Color.FromArgb(150, palette.Sub), Math.Max(1.5f, 2.2f * Gfx.Scale)))
                 Gfx.DrawTray(g, pen, w / 2f, top + glyph / 2f, glyph);
 
             int y = (int)(top + glyph + gap);
-            for (int i = 0; i < Lines.Length; i++)
+            for (int i = 0; i < lines.Length; i++)
             {
-                if (Lines[i].Length > 0)
-                    TextRenderer.DrawText(g, Lines[i], Font, new Rectangle(0, y, w, lineH),
+                if (lines[i].Length > 0)
+                    TextRenderer.DrawText(g, lines[i], Font, new Rectangle(0, y, w, lineH),
                         i == 0 ? Ease.Lerp(palette.Sub, palette.Text, 0.45f) : palette.Sub,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
                 y += lineH;
